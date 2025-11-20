@@ -3,9 +3,10 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
-	"image"
 	"os"
 	"path/filepath"
+
+	"github.com/VishalHilal/mini-docker/internal/image"
 )
 
 type LocalRegistry struct {

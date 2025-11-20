@@ -1,19 +1,19 @@
 package api
 
 import (
-	"archive/tar"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
-	"mini-dockr/internal/image"
-	"mini-dockr/internal/registry"
-	"mini-dockr/internal/runtime"
+	"github.com/gorilla/mux"
+
+	"github.com/VishalHilal/mini-docker/internal/image"
+	"github.com/VishalHilal/mini-docker/internal/registry"
+	"github.com/VishalHilal/mini-docker/internal/runtime"
 )
 
 type Server struct {
@@ -45,18 +45,30 @@ func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
 	// Save incoming tar to temp file
 	tmp := filepath.Join(os.TempDir(), fmt.Sprintf("build-%d.tar", time.Now().UnixNano()))
 	f, err := os.Create(tmp)
-	if err != nil { http.Error(w, err.Error(), 500); return }
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 	defer f.Close()
 	_, err = io.Copy(f, r.Body)
-	if err != nil { http.Error(w, err.Error(), 500); return }
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 
 	// build image (extract to layer dir)
 	img, err := image.BuildFromTar(tmp, name, s.reg.StoragePath())
-	if err != nil { http.Error(w, err.Error(), 500); return }
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 
 	// register
 	err = s.reg.PushImage(img)
-	if err != nil { http.Error(w, err.Error(), 500); return }
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 	w.Write([]byte("ok\n"))
 }
 
@@ -71,14 +83,16 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		Cmd   []string `json:"cmd"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), 400); return
+		http.Error(w, err.Error(), 400)
+		return
 	}
 
 	// create runtime config
 	rt := runtime.NewRuntime(s.reg.StoragePath())
 	id, err := rt.RunContainer(req.Image, req.Cmd)
 	if err != nil {
-		http.Error(w, err.Error(), 500); return
+		http.Error(w, err.Error(), 500)
+		return
 	}
 	w.Write([]byte(id))
 }
@@ -93,7 +107,8 @@ func (s *Server) handleDeleteContainer(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 	err := runtime.KillContainer(id)
 	if err != nil {
-		http.Error(w, err.Error(), 500); return
+		http.Error(w, err.Error(), 500)
+		return
 	}
 	w.Write([]byte("ok"))
 }

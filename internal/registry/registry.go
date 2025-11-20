@@ -3,9 +3,9 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
-	"mini-dockr/internal/image"
 )
 
 type LocalRegistry struct {
@@ -42,7 +42,9 @@ func (r *LocalRegistry) ListImages() ([]*image.Image, error) {
 func (r *LocalRegistry) GetImageByName(name string) (*image.Image, error) {
 	images, _ := r.ListImages()
 	for _, img := range images {
-		if img.Name == name { return img, nil }
+		if img.Name == name {
+			return img, nil
+		}
 	}
 	return nil, fmt.Errorf("image not found")
 }

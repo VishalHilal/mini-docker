@@ -3,11 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -86,7 +86,10 @@ func build(path, imageName string) {
 
 func images() {
 	resp, err := http.Get(engineURL + "/images")
-	if err != nil { fmt.Println(err); return }
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	defer resp.Body.Close()
 	io.Copy(os.Stdout, resp.Body)
 }
@@ -97,14 +100,20 @@ func run(image string, cmd []string) {
 		"cmd":   cmd,
 	})
 	resp, err := http.Post(engineURL+"/containers/run", "application/json", bytes.NewReader(b))
-	if err != nil { fmt.Println(err); return }
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	defer resp.Body.Close()
 	io.Copy(os.Stdout, resp.Body)
 }
 
 func ps() {
 	resp, err := http.Get(engineURL + "/containers")
-	if err != nil { fmt.Println(err); return }
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	defer resp.Body.Close()
 	io.Copy(os.Stdout, resp.Body)
 }
@@ -112,7 +121,10 @@ func ps() {
 func rm(id string) {
 	req, _ := http.NewRequest("DELETE", engineURL+"/containers/"+id, nil)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil { fmt.Println(err); return }
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	defer resp.Body.Close()
 	io.Copy(os.Stdout, resp.Body)
 }

@@ -1,17 +1,19 @@
 package runtime
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"sync"
+	"syscall"
+	"time"
 )
 
 var (
 	running = map[string]*os.Process{}
-	mu sync.Mutex
+	mu      sync.Mutex
 )
 
 type Runtime struct {
@@ -34,9 +36,15 @@ func (r *Runtime) RunContainer(imageName string, cmdArgs []string) (string, erro
 	metas, _ := os.ReadDir(metaDir)
 	for _, m := range metas {
 		b, _ := os.ReadFile(filepath.Join(metaDir, m.Name()))
-		if string(b) == "" { continue }
+		if string(b) == "" {
+			continue
+		}
 		// quick parse name
-		type tmp struct { Name string `json:"name"`; Rootfs string `json:"rootfs"`; ID string `json:"id"` }
+		type tmp struct {
+			Name   string `json:"name"`
+			Rootfs string `json:"rootfs"`
+			ID     string `json:"id"`
+		}
 		var t tmp
 		_ = json.Unmarshal(b, &t)
 		if t.Name == imageName {

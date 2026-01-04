@@ -29,7 +29,22 @@ Development environment with hot reload using Air.
 
 ## Usage
 
-### Basic Setup
+### Quick Start with Helper Scripts
+```bash
+# Linux/Mac
+./scripts/docker-helper.sh start
+
+# Windows
+.\scripts\docker-helper.bat start
+
+# Start with testing profile
+./scripts/docker-helper.sh start testing
+
+# Start development environment
+./scripts/docker-helper.sh start dev
+```
+
+### Manual Docker Compose Commands
 ```bash
 # Start the engine only
 docker-compose up engine

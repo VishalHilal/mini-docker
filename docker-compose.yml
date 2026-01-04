@@ -8,16 +8,30 @@ services:
       dockerfile: Dockerfile
       target: build
     container_name: mini-docker-engine
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${ENGINE_PORT:-8080}:8080"
     volumes:
-      - /tmp/mini-docker:/tmp/mini-docker
+      - mini-docker-registry:/tmp/mini-docker
       - /var/run/docker.sock:/var/run/docker.sock
     privileged: true
     command: ["go", "run", "./cmd/engine/main.go"]
     working_dir: /src
+    env_file:
+      - .env
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/images"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - mini-docker-net
 
@@ -29,10 +43,11 @@ services:
       target: build
     container_name: mini-docker-cli
     depends_on:
-      - engine
+      engine:
+        condition: service_healthy
     volumes:
       - ./examples:/examples:ro
-      - /tmp/mini-docker:/tmp/mini-docker
+      - mini-docker-registry:/tmp/mini-docker
     command: ["sleep", "infinity"]
     working_dir: /src
     environment:

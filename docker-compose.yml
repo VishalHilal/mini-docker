@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Mini-docker engine API server
+  engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    container_name: mini-docker-engine
+    ports:
+      - "8080:8080"
+    volumes:
+      - /tmp/mini-docker:/tmp/mini-docker
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    command: ["go", "run", "./cmd/engine/main.go"]
+    working_dir: /src
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    networks:
+      - mini-docker-net
+
+  # CLI client container (for testing)
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    container_name: mini-docker-cli
+    depends_on:
+      - engine
+    volumes:
+      - ./examples:/examples:ro
+      - /tmp/mini-docker:/tmp/mini-docker
+    command: ["sleep", "infinity"]
+    working_dir: /src
+    environment:
+      - ENGINE_URL=http://engine:8080
+    networks:
+      - mini-docker-net
+    profiles:
+      - testing
+
+  # Development environment with hot reload
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: mini-docker-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/src
+      - /tmp/mini-docker:/tmp/mini-docker
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    networks:
+      - mini-docker-net
+    profiles:
+      - dev
+
+networks:
+  mini-docker-net:
+    driver: bridge
+
+volumes:
+  mini-docker-registry:
+    driver: local

@@ -27,12 +27,23 @@ func NewServer(baseDir string) *Server {
 
 func (s *Server) Run(addr string) error {
 	r := mux.NewRouter()
+	r.HandleFunc("/health", s.handleHealth).Methods("GET")
 	r.HandleFunc("/images/build", s.handleBuild).Methods("POST")
 	r.HandleFunc("/images", s.handleImages).Methods("GET")
 	r.HandleFunc("/containers/run", s.handleRun).Methods("POST")
 	r.HandleFunc("/containers", s.handleListContainers).Methods("GET")
 	r.HandleFunc("/containers/{id}", s.handleDeleteContainer).Methods("DELETE")
 	return http.ListenAndServe(addr, r)
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":    "healthy",
+		"service":   "mini-docker-engine",
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
 }
 
 func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {

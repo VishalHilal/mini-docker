@@ -7,13 +7,17 @@ services:
       context: .
       dockerfile: Dockerfile
       target: build
+      args:
+        - GO_VERSION=1.21
+        - BUILDKIT_INLINE_CACHE=1
     container_name: mini-docker-engine
     restart: unless-stopped
     ports:
       - "${ENGINE_PORT:-8080}:8080"
     volumes:
       - mini-docker-registry:/tmp/mini-docker
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - ./logs:/var/log/mini-docker
     privileged: true
     command: ["go", "run", "./cmd/engine/main.go"]
     working_dir: /src
@@ -21,6 +25,8 @@ services:
       - .env
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - GOMAXPROCS=${GOMAXPROCS:-2}
+      - GOGC=${GOGC:-100}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/images"]
       interval: 10s
@@ -32,8 +38,24 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+        labels: "service=engine"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
     networks:
       - mini-docker-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.engine.rule=Host(`localhost`)"
+      - "traefik.http.services.engine.loadbalancer.server.port=8080"
 
   # CLI client container (for testing)
   cli:
@@ -41,6 +63,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: build
+      args:
+        - GO_VERSION=1.21
+        - BUILDKIT_INLINE_CACHE=1
     container_name: mini-docker-cli
     depends_on:
       engine:
@@ -48,12 +73,32 @@ services:
     volumes:
       - ./examples:/examples:ro
       - mini-docker-registry:/tmp/mini-docker
+      - ./logs:/var/log/mini-docker
     command: ["sleep", "infinity"]
     working_dir: /src
     environment:
       - ENGINE_URL=http://engine:8080
+      - GOMAXPROCS=${GOMAXPROCS:-1}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+        labels: "service=cli"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
     networks:
       - mini-docker-net
+    labels:
+      - "traefik.enable=false"
     profiles:
       - testing
 
@@ -62,25 +107,75 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        - GO_VERSION=1.21
     container_name: mini-docker-dev
+    restart: "no"
     ports:
-      - "8080:8080"
+      - "${ENGINE_PORT:-8080}:8080"
+      - "${AIR_PORT:-2345}:2345"  # Air debug port
     volumes:
-      - .:/src
-      - /tmp/mini-docker:/tmp/mini-docker
-      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/src:rw
+      - mini-docker-registry:/tmp/mini-docker
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - ./logs:/var/log/mini-docker
+      - /tmp/air:/tmp/air  # Air temp directory
     privileged: true
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - GOMAXPROCS=${GOMAXPROCS:-2}
+      - GOGC=${GOGC:-100}
+      - AIR_TMP_DIR=/tmp/air
+      - GOENV=development
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=dev"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
     networks:
       - mini-docker-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dev.rule=Host(`localhost`,`dev.localhost`)"
+      - "traefik.http.services.dev.loadbalancer.server.port=8080"
     profiles:
       - dev
 
 networks:
   mini-docker-net:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: mini-docker0
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.driver.mtu: "1500"
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+    labels:
+      - "project=mini-docker"
+      - "environment=development"
 
 volumes:
   mini-docker-registry:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/registry
+    labels:
+      - "project=mini-docker"
+      - "service=registry"
